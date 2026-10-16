@@ -1,6 +1,10 @@
 const User = require("../models/User.model")
 const bcrypt = require("bcryptjs")
-const jwt = require("jsonwebtoken")
+const jwt = require("jsonwebtoken");
+const AppError = require("../utils/AppError");
+const config = require("../config/env");
+const { generateRefreshToken, hashRefreshToken } = require("../utils/refreshToken");
+const RefreshToken = require("../models/RefreshToken.model");
 
 async function loginUser({ email, password }) {
     const normalizedEmail = email.trim().toLowerCase();
@@ -10,9 +14,7 @@ async function loginUser({ email, password }) {
     }).select("+password");
 
     if (!user) {
-        const error = new Error("E-poçt və ya şifrə yanlışdır");
-        error.statusCode = 401;
-        throw error;
+       throw new AppError("E-poçt və ya şifrə yanlışdır", 401)
     }
 
     const isPasswordCorrect = await bcrypt.compare(
@@ -21,28 +23,57 @@ async function loginUser({ email, password }) {
     );
 
     if (!isPasswordCorrect) {
-        const error = new Error("E-poçt və ya şifrə yanlışdır");
-        error.statusCode = 401;
-        throw error;
+        throw new AppError("E-poçt və ya şifrə yanlışdır",401);
     }
 
-    const token = jwt.sign(
-        { userId: user._id.toString() },
-        process.env.JWT_SECRET,
-        { expiresIn: "1d" }
+    if(!user.isActive){
+        throw new AppError("Bu hesab aktiv deyil",403);
+    }
+
+    const accessToken = jwt.sign(
+        {
+            sub: user._id.toString(),
+            role: user.role
+        },
+        config.jwtAccessSecret,
+        {
+            expiresIn: config.jwtAccessSecretExpiresIn,
+            issuer: "ecommerce-api-zero",
+            audience: "ecommerce-client"
+        }
     );
+
+    const refreshToken = generateRefreshToken();
+
+    const tokenHash = hashRefreshToken(refreshToken)
+
+    const expiresAt = new Date(
+        Date.now() + config.refreshTokenExpiresDays*24*60*60*1000
+    )
+
+    await RefreshToken.create({
+        user: user._id,
+        tokenHash,
+        expiresAt
+    })
+
+
 
     return {
         user: {
             id: user._id,
             name: user.name,
             email: user.email,
-            role: user.role,
-            createdAt: user.createdAt
+            role: user.role
         },
-        token
+        accessToken,
+        refreshToken,
+        tokenType: "Bearer",
+        expiresIn: config.jwtAccessSecretExpiresIn
     };
 }
+
+
 
 async function registerUser({name, email, password}) {
     const normalizedEmail = email.trim().toLowerCase()
@@ -50,9 +81,7 @@ async function registerUser({name, email, password}) {
     const existingUser = await User.findOne({email: normalizedEmail})
 
     if(existingUser){
-        const error = new Error("Bu e-poçt ünvanı artıq istifadə olunur")
-        error.statusCode = 409 // Conflict code
-        throw error
+       throw new AppError("Bu e-poçt ünvanı artıq qeydiyyatdan keçib", 409)
     }
 
     const hashedPassword = await bcrypt.hash(password, 12)
@@ -72,9 +101,7 @@ async function registerUser({name, email, password}) {
         }
     } catch (error) {
         if(error.code === 11000){
-            const duplicateError = new Error("Bu e-poçt ünvanı artıq istifadə olunur")
-            duplicateError.statusCode = 409
-            throw duplicateError
+            throw new AppError("Bu e-poçt ünvanı artıq qeydiyyatdan keçib",409)
         }
 
         throw error
