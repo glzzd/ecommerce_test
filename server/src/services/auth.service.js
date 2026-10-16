@@ -1,8 +1,47 @@
 const User = require("../models/User.model")
 const bcrypt = require("bcryptjs")
+const jwt = require("jsonwebtoken")
 
-async function loginUser({email, password}) {
+async function loginUser({ email, password }) {
+    const normalizedEmail = email.trim().toLowerCase();
 
+    const user = await User.findOne({
+        email: normalizedEmail
+    }).select("+password");
+
+    if (!user) {
+        const error = new Error("E-poçt və ya şifrə yanlışdır");
+        error.statusCode = 401;
+        throw error;
+    }
+
+    const isPasswordCorrect = await bcrypt.compare(
+        password,
+        user.password
+    );
+
+    if (!isPasswordCorrect) {
+        const error = new Error("E-poçt və ya şifrə yanlışdır");
+        error.statusCode = 401;
+        throw error;
+    }
+
+    const token = jwt.sign(
+        { userId: user._id.toString() },
+        process.env.JWT_SECRET,
+        { expiresIn: "1d" }
+    );
+
+    return {
+        user: {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            createdAt: user.createdAt
+        },
+        token
+    };
 }
 
 async function registerUser({name, email, password}) {
