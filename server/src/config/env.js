@@ -7,7 +7,7 @@ const config = {
     port: Number(process.env.PORT) || 3000,
     mongoUrl: process.env.MONGO_URL,
     jwtAccessSecret: process.env.JWT_ACCESS_SECRET,
-    jwtAccessSecretExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
+    jwtAccessExpiresIn: process.env.JWT_ACCESS_EXPIRES_IN || "15m",
     refreshTokenExpiresDays: Number(process.env.REFRESH_TOKEN_EXPIRES_DAYS) || 7
 }
 
