@@ -1,4 +1,5 @@
 const Product = require("../models/Product");
+const AppError = require("../utils/AppError");
 
 function generateSlug(value) {
   return value
@@ -19,6 +20,64 @@ function generateSlug(value) {
     .replace(/-+/g, "-")
     .replace(/^-|-$/g, "");
 }
+
+async function deleteProduct(id){
+    const product = await Product.findByIdAndDelete(id)
+
+    if(!product){
+        throw new AppError("Məhsul tapılmadı", 404)
+    }
+
+    return product
+}
+
+async function updateProduct(id, data) {
+    const allowedFields = [
+        "name",
+        "slug",
+        "description",
+        "price",
+        "compareAtPrice",
+        "sku",
+        "stock",
+        "category",
+        "images",
+        "status",
+        "category"
+    ]
+
+    const updates = {}
+
+    for(const field of allowedFields){
+        if(Object.prototype.hasOwnProperty.call(data, field)){
+            updates[field] = data[field]
+        }
+    }
+
+    if(updates.name && !updates.slug){
+        updates.slug = generateSlug(updates.name)
+    } else if(updates.slug){
+        updates.slug = generateSlug(updates.slug)
+    }
+
+
+    const product = await Product.findByIdAndUpdate(id, {$set: updates},{new: true, runValidators:true})
+
+    if(!product){
+        throw new AppError("Məhsul tapılmadı", 404)
+    }
+    return product
+}
+
+async function getProductById(id) {
+    const product = await Product.findById(id).lean()
+    if(!product){
+        throw new AppError("Məhsul tapılmadı", 404)
+    }
+
+    return product
+}
+
 
 async function createProduct(data) {
     if (!Array.isArray(data) || data.length === 0) {
@@ -48,5 +107,8 @@ async function getProducts() {
 
 module.exports = {
     createProduct,
-    getProducts
+    getProducts,
+    getProductById,
+    updateProduct,
+    deleteProduct
 }

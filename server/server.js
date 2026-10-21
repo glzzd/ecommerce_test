@@ -2,12 +2,19 @@ const config = require("./src/config/env");
 const { connectDB, disconnectDB } = require("./src/config/db");
 const app = require("./src/app");
 const User = require("./src/models/User.model");
+const {connectRedis} = require("./src/config/redis");
 
 let server;
 
 async function startServer() {
   try {
     await connectDB();
+
+    try {
+      await connectRedis()
+    } catch (error) {
+      console.error("Redis əlçatan deyil. Keşsiz davam edilir: ", error.message)
+    }
 
     server = app.listen(config.port, () => {
       console.log(`Server ${config.port} nömrəli portda işləyir`);
