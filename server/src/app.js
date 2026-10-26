@@ -2,6 +2,7 @@ const express = require("express")
 const cookieParser = require("cookie-parser")
 const authRoutes = require("./routes/auth.routes")
 const productRoutes = require("./routes/product.routes")
+const cartRoutes = require("./routes/cart.routes")
 const notFound = require("./middleware/notFound")
 const errorHandler = require("./middleware/errorHandler")
 
@@ -21,6 +22,7 @@ app.get("/api/health", (req, res)=>{
 
 app.use("/api/auth", authRoutes)
 app.use("/api/products", productRoutes)
+app.use("/api/cart", cartRoutes)
 
 // Marşrut tapılmadıqda
 app.use(notFound)
