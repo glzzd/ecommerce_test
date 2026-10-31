@@ -7,6 +7,15 @@ const Product = require("../models/Product");
 
 const ACTIVE_PRODUCT_STATUS = "active";
 
+const ALLOWED_TRANSITIONS = {
+  pending: ["confirmed", "cancelled"],
+  confirmed: ["processing", "cancelled"],
+  processing: ["shipped", "cancelled"],
+  shipped: ["delivered"],
+  delivered: [],
+  cancelled: []
+}
+
 function getCartCacheKey(userId) {
   return `cart:${userId}`;
 }
@@ -61,6 +70,9 @@ function validateShippingAddress(address) {
       typeof address.postalCode === "string" ? address.postalCode.trim() : "",
   };
 }
+
+
+
 
 async function checkout(userId, addressInput) {
   if (!mongoose.isValidObjectId(userId)) {
@@ -218,4 +230,177 @@ async function checkout(userId, addressInput) {
   } finally {
     await session.endSession();
   }
+}
+
+async function getMyOrders(userId, query={}) {
+  const page = Math.max(1, Number.parseInt(query.page, 10) || 1)
+  const limit = Math.min(50, Number.parseInt(query.limit, 10) || 10)
+  const filter = {user: userId};
+
+  if(query.status){
+    const allowedStatus = [
+      "pending",
+      "confirmed",
+      "processing",
+      "shipped",
+      "delivered",
+      "cancelled"
+    ]
+
+    if(!allowedStatus.includes(query.status)){
+      throw new AppError("Sifariş statusu yanlışdır", 400)
+    }
+
+    filter.status = query.status
+  }
+
+  const [orders, total] = await Promise.all([
+    Order.find(filter).toSorted({createdAt: -1}).skip((page-1)*limit).limit(limit).lean(),
+    Order.countDocuments(filter)
+  ])
+
+  return {
+    orders,
+    pagination: {
+      page,
+      limit,
+      total,
+      totalPages: Math.ceil(total/limit)
+
+    }
+  }
+
+}
+
+async function cancelMyOrder(userId, orderId) {
+  if(!mongoose.isValidObjectId(orderId)){
+    throw new AppError("Sifariş İD-si yanlışdır", 400)
+  }
+
+  const session = await mongoose.startSession();
+
+  try {
+    let cancelledOrder;
+    await session.withTransaction(async()=>{
+      const order = await Order.findOne({
+        _id: orderId,
+        user: userId
+      }).session(session)
+
+      if(!order){
+        throw new AppError("Sifariş tapılmadı", 404)
+      }
+
+      // Yalnız pending statusunda olan sifarişlər MÜŞTƏRİ TƏRƏFİNDƏN ləğv edilə bilər
+      if(order.status !== "pending"){
+        throw new AppError("Bu statusda olan sifariş ləğv edilə bilməz", 400)
+      }
+
+      if(order.paymentStatus === "paid"){
+        throw new AppError("Ödəniş edilmiş sifariş üçün REFUND prosesi tələb olunur", 409)
+      }
+
+      // Stoku geri qaytaririq
+      for(const item of order.items){
+        const stockRestore = await Product.updateOne(
+          {_id: item.product},
+          {$inc: {stock: item.quantity}},
+          {session}
+        )
+
+        if(stockRestore.matchedCount !==1){
+          throw new AppError("Məhsul stokda bərpa edilmədi", 409)
+        }
+      }
+
+      order.status = "cancelled"
+      order.cancelledAt = new Date()
+
+      await order.save({session})
+
+      cancelledOrder = order
+    })
+
+    return cancelledOrder
+
+  } finally {
+    await session.endSession()
+  }
+}
+
+async function updateOrderStatus(orderId, nextStatus) {
+  if(!mongoose.isValidObjectId(orderId)){
+    throw new AppError("Sifariş= İD-si yanlışdır", 400)
+  }
+
+  const allowedStatuses = Object.keys(ALLOWED_TRANSITIONS)
+
+  if(!allowedStatuses.includes(nextStatus)){
+    throw new AppError("Yeni status yanlışdır", 400)
+  }
+
+  const session = await mongoose.startSession()
+
+  try {
+    let updatedOrder
+
+    await session.withTransaction(async()=>{
+       const order = await Order.findById(orderId).session(session)
+
+       if(!order){
+        throw new AppError("Sifariş tapılmadı", 404)
+        
+       }
+       
+       const allowedNextStatuses = ALLOWED_TRANSITIONS[order.status]
+
+       if(!allowedNextStatuses.includes(nextStatus)){
+        throw new AppError(`Sifariş ${order.status} statusundan ${nextStatus} statusuna keçirilə bilməz`, 409)
+       }
+
+      //  Admin ləğv edərsə
+      if(nextStatus === "cancelled" && order.paymentStatus === "paid"){
+        throw new AppError("Ödəniş edilmiş sifariş REFUND prosesi olmadan ləğv edilə bilməz", 409)
+      }
+
+      // Stok ancaq sifaris heqiqeten legv olunursa geri qaytarılır
+      if(nextStatus==="cancelled"){
+        for(const item of order.items){
+          const stockRestore = await Product.updateOne(
+            {_id: item.product},
+            {$inc: {stock: item.quantity}},
+            {session}
+          )
+
+          if(stockRestore.matchedCount !==1){
+            throw new AppError("Məhsul stoku bərpa edilə bilmədi", 409)
+          }
+        }
+
+        if(nextStatus === "delivered"){
+          order.deliveredAt = new Date()
+        }
+
+        order.status = nextStatus
+
+        await order.save({session})
+
+        updateOrder = order
+
+
+      }
+
+      return updatedOrder
+    })
+  } finally {
+    await session.endSession()
+  }
+}
+
+
+module.exports={
+  checkout,
+  getMyOrders,
+  cancelMyOrder,
+  updateOrderStatus
 }
