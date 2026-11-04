@@ -4,6 +4,7 @@ const AppError = require("../utils/AppError");
 const Cart = require("../models/Cart");
 const Order = require("../models/Order");
 const Product = require("../models/Product");
+const crypto = require("node:crypto");
 
 const ACTIVE_PRODUCT_STATUS = "active";
 
@@ -40,6 +41,7 @@ function generateOrderNumber() {
   return `ORD-${Date.now()}-${randomPart}`;
 }
 
+
 function validateShippingAddress(address) {
   const requiredFields = [
     "fullName",
@@ -54,22 +56,30 @@ function validateShippingAddress(address) {
   }
 
   for (const field of requiredFields) {
-    if (typeof address[field] !== "string" || !address[field].trim()) {
-      throw new AppError(`${field} sahəsi mütləq doldurulmalıdır`, 400);
+    if (
+      typeof address[field] !== "string" ||
+      !address[field].trim()
+    ) {
+      throw new AppError(
+        `${field} sahəsi mütləq doldurulmalıdır`,
+        400
+      );
     }
   }
 
-  // Yalnız icazə verilən sahələri saxlayırıq
   return {
     fullName: address.fullName.trim(),
     phone: address.phone.trim(),
     country: address.country.trim(),
     city: address.city.trim(),
-    addressLine: address.postalCode.trim(),
+    addressLine: address.addressLine.trim(),
     postalCode:
-      typeof address.postalCode === "string" ? address.postalCode.trim() : "",
+      typeof address.postalCode === "string"
+        ? address.postalCode.trim()
+        : "",
   };
 }
+
 
 
 
@@ -132,7 +142,7 @@ async function checkout(userId, addressInput) {
 
         const unitPrice = roundMoney(product.price);
         const lineTotal = roundMoney(unitPrice * quantity);
-        subtotal = roundMoney(subTotal + lineTotal);
+        subTotal = roundMoney(subTotal + lineTotal);
 
         orderItems.push({
           product: product._id,
@@ -193,7 +203,7 @@ async function checkout(userId, addressInput) {
             tax,
             discount,
             total,
-            status: "pendig",
+            status: "pending",
             paymentStatus: "unpaid",
           },
         ],

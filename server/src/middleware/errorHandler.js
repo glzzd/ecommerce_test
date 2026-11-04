@@ -3,10 +3,17 @@ function errorHandler(err, req, res, next){
     let message = err.message || "Server xətası baş verdi"
 
     // Mongoose melumat yoxlamasi xetasi
-    if(err.name === "ValidationError"){
-        statusCode = 400
-        message = "Göndərilən məlumatlar düzgün deyil!"
-    }
+  if (err.name === "ValidationError") {
+    return res.status(400).json({
+        success: false,
+        message: "Göndərilən məlumatlar düzgün deyil!",
+        errors: Object.values(err.errors).map(error => ({
+            field: error.path,
+            message: error.message,
+            value: error.value
+        }))
+    });
+}
 
 
     // Mongoose yanlis ObjectId xetasi

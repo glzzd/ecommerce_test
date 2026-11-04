@@ -4,7 +4,7 @@ const orderService = require("../services/order.service");
 const checkout = asyncHandler(async (req, res)=>{
     const order = await orderService.checkout(
         req.user._id,
-        req.body.shippingAdress
+        req.body.shippingAddress
     )
 
     res.status(201).json({
@@ -38,7 +38,6 @@ const cancelMyOrder = asyncHandler(async (req, res)=>{
         data: {order}
     })
 })
-
 
 const updateOrderStatus = asyncHandler(async (req, res)=>{
     const order = await orderService.updateOrderStatus(

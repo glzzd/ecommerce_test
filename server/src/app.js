@@ -3,6 +3,8 @@ const cookieParser = require("cookie-parser")
 const authRoutes = require("./routes/auth.routes")
 const productRoutes = require("./routes/product.routes")
 const cartRoutes = require("./routes/cart.routes")
+const orderRoutes = require("./routes/order.routes")
+const paymentRoutes = require("./routes/payment.routes")
 const notFound = require("./middleware/notFound")
 const errorHandler = require("./middleware/errorHandler")
 
@@ -23,7 +25,8 @@ app.get("/api/health", (req, res)=>{
 app.use("/api/auth", authRoutes)
 app.use("/api/products", productRoutes)
 app.use("/api/cart", cartRoutes)
-
+app.use("/api/orders", orderRoutes)
+app.use("/api/payments", paymentRoutes)
 // Marşrut tapılmadıqda
 app.use(notFound)
 
