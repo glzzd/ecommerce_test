@@ -5,11 +5,14 @@ const productRoutes = require("./routes/product.routes")
 const cartRoutes = require("./routes/cart.routes")
 const orderRoutes = require("./routes/order.routes")
 const paymentRoutes = require("./routes/payment.routes")
+const paymentWebhookRoutes = require("./routes/paymentWebhook.routes")
 const notFound = require("./middleware/notFound")
 const errorHandler = require("./middleware/errorHandler")
 
 
 const app = express()
+
+app.use("/api/webhooks", paymentWebhookRoutes)
 
 app.use(express.json({limit: "10kb"}))
 app.use(cookieParser())
