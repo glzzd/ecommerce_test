@@ -190,6 +190,7 @@ async function registerUser({ name, email, password }) {
       name: name.trim(),
       email: normalizedEmail,
       password: hashedPassword,
+      role: "customer"
     });
     return {
       id: user._id,
