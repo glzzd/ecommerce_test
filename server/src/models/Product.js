@@ -45,6 +45,22 @@ const productSchema = new mongoose.Schema({
             message: "Stok tam ədəd olmalıdır"
         }
     },
+
+    reservedStock: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    
+    lowStockThreshold: {
+        type: Number,
+        default: 5,
+        min: 0
+    },
+    trackInventory: {
+        type: Boolean,
+        default: true
+    },
     category: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Category",
